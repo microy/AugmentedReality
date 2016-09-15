@@ -8,7 +8,7 @@
 uvcdynctrl -v -d video0 --set='Focus, Auto' 0
 
 # Fix the focus
-uvcdynctrl -v -d video0 --set='Focus (absolute)' 30
+uvcdynctrl -v -d video0 --set='Focus (absolute)' 0
 
 # Fix power line frequency
 uvcdynctrl -v -d video0 --set='Power Line Frequency' 1
