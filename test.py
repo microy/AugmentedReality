@@ -6,9 +6,10 @@
 #
 
 # External dependencies
+import sys
+import threading
 import cv2
 import numpy as np
-import threading
 from PyQt4 import QtCore
 from PyQt4 import QtGui
 
@@ -20,15 +21,17 @@ pattern_size = ( 9, 6 )
 
 
 # Stereovision user interface
-class CalibrationWidget( QtGui.QWidget ) :
+class CameraCalibrationWidget( QtGui.QWidget ) :
 	# Signal sent to update the image in the widget
-	update_image = QtCore.pyqtSignal( np.ndarray )
+	update_image = QtCore.pyqtSignal()
 	# Initialization
 	def __init__( self, parent = None ) :
 		# Initialise QWidget
-		super( CalibrationWidget, self ).__init__( parent )
+		super( CameraCalibrationWidget, self ).__init__( parent )
 		# Set the window title
 		self.setWindowTitle( 'Camera Calibration' )
+		# Initialize the viewing parameters
+		self.chessboard_enabled = False
 		# Connect the signal to update the image
 		self.update_image.connect( self.UpdateImage )
 		# Widget to display the images from the cameras
@@ -41,6 +44,7 @@ class CalibrationWidget( QtGui.QWidget ) :
 		self.button_chessboard.clicked.connect( self.ToggleChessboard )
 		self.button_calibration = QtGui.QPushButton( 'Calibration', self )
 		self.button_calibration.setShortcut( 'F2' )
+		self.button_calibration.clicked.connect( self.Calibration )
 		self.spinbox_pattern_rows = QtGui.QSpinBox( self )
 		self.spinbox_pattern_rows.setValue( pattern_size[0] )
 		self.spinbox_pattern_rows.valueChanged.connect( self.UpdatePatternSize )
@@ -64,27 +68,25 @@ class CalibrationWidget( QtGui.QWidget ) :
 		QtGui.QShortcut( QtGui.QKeySequence( QtCore.Qt.Key_Escape ), self ).activated.connect( self.close )
 		# Initialize the USB stereo cameras
 		self.camera = UsbCamera()
-		# Lower the camera frame rate and resolution
-		self.camera.camera.set( cv2.CAP_PROP_FRAME_WIDTH, 640 )
-		self.camera.camera.set( cv2.CAP_PROP_FRAME_HEIGHT, 480 )
-		self.camera.camera.set( cv2.CAP_PROP_FPS, 5 )
 		# Fix the widget size
 		self.image_widget.setFixedSize( self.camera.width, self.camera.height )
 		# Start image acquisition
-		self.stereo_camera.StartCapture(  self.ImageCallback  )
+		self.camera.StartCapture(  self.ImageCallback  )
 	# Receive the frame sent by the camera
 	def ImageCallback( self, image ) :
-		# Process the images
-		self.update_image.emit( image )
-	# Process the given stereo images
-	def UpdateImage( self, image ) :
 		# Get the image
 		self.image = image
+		# Process the images
+		self.update_image.emit()
+	# Process the given stereo images
+	def UpdateImage( self ) :
 		# Copy images for display
 		image_displayed = np.copy( self.image )
 		# Preview the calibration chessboard on the image
 		if self.chessboard_enabled :
 			image_displayed = PreviewChessboard( image_displayed )
+		# Convert image color format from BGR to RGB
+		image_displayed = cv2.cvtColor( image_displayed, cv2.COLOR_BGR2RGB )
 		# Create a Qt image
 		qimage = QtGui.QImage( image_displayed, image_displayed.shape[1], image_displayed.shape[0], QtGui.QImage.Format_RGB888 )
 		# Set the image to the Qt widget
@@ -161,8 +163,10 @@ def SaveCalibration( calibration, filename = 'calibration.pkl' ) :
 
 # Find the chessboard quickly, and draw it
 def PreviewChessboard( image ) :
+	# Convert image from BGR to Grayscale
+	chessboard = cv2.cvtColor( image, cv2.COLOR_BGR2GRAY )
 	# Find the chessboard corners on the image
-	found, corners = cv2.findChessboardCorners( image, pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
+	found, corners = cv2.findChessboardCorners( chessboard, pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
 #	found, corners = cv2.findCirclesGridDefault( image, pattern_size, flags = cv2.CALIB_CB_ASYMMETRIC_GRID )
 	# Draw the chessboard corners on the image
 	if found : cv2.drawChessboardCorners( image, pattern_size, corners, found )
@@ -260,6 +264,13 @@ def CameraCalibration( image_files ) :
 
 # Main application
 if __name__ == '__main__' :
+
+	application = QtGui.QApplication( sys.argv )
+	widget = CameraCalibrationWidget()
+	widget.show()
+	sys.exit( application.exec_() )
+
+def maincv() :
     # Calibration images
     calibration_images = []
     cap = cv2.VideoCapture( 0 )
