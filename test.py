@@ -6,8 +6,12 @@
 #
 
 # External dependencies
+import glob
+import math
+import pickle
 import sys
 import threading
+import time
 import cv2
 import numpy as np
 from PyQt4 import QtCore
@@ -18,6 +22,43 @@ from PyQt4 import QtGui
 pattern_size = ( 9, 6 )
 
 
+# Thread to read the images from a USB camera
+class UsbCamera( threading.Thread ) :
+	# Initialisation
+	def __init__( self ) :
+		# Initialize the thread
+		super( UsbCamera, self ).__init__()
+		# Initialize the cameras
+		self.camera = cv2.VideoCapture( 0 )
+	# Return the image width
+	@property
+	def width( self ) :
+		return self.camera.get( cv2.CAP_PROP_FRAME_WIDTH )
+	# Return the image height
+	@property
+	def height( self ) :
+		return self.camera.get( cv2.CAP_PROP_FRAME_HEIGHT )
+	# Start acquisition
+	def StartCapture( self, image_callback ) :
+		# Function called when the image is ready
+		self.image_callback = image_callback
+		# Start the capture loop
+		self.running = True
+		self.start()
+	# Stop acquisition
+	def StopCapture( self ) :
+		self.running = False
+		self.join()
+	# Thread main loop
+	def run( self ) :
+		# Thread running
+		while self.running :
+			# Capture image
+			_, image = self.camera.read()
+			# Send the image via the external callback function
+			self.image_callback( image )
+		# Release the cameras
+		self.camera.release()
 
 
 # Stereovision user interface
@@ -42,6 +83,9 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 		self.button_chessboard.setCheckable( True )
 		self.button_chessboard.setShortcut( 'F1' )
 		self.button_chessboard.clicked.connect( self.ToggleChessboard )
+		self.button_capture = QtGui.QPushButton( 'Capture', self )
+		self.button_capture.setShortcut( 'Space' )
+		self.button_capture.clicked.connect( self.Capture )
 		self.button_calibration = QtGui.QPushButton( 'Calibration', self )
 		self.button_calibration.setShortcut( 'F2' )
 		self.button_calibration.clicked.connect( self.Calibration )
@@ -53,11 +97,12 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 		self.spinbox_pattern_cols.valueChanged.connect( self.UpdatePatternSize )
 		# Widget layout
 		self.layout_pattern_size = QtGui.QHBoxLayout()
-		self.layout_pattern_size.addWidget( QtGui.QLabel( 'Calibration pattern size :' ) )
+		self.layout_pattern_size.addWidget( QtGui.QLabel( 'Pattern size :' ) )
 		self.layout_pattern_size.addWidget( self.spinbox_pattern_rows )
 		self.layout_pattern_size.addWidget( self.spinbox_pattern_cols )
 		self.layout_controls = QtGui.QHBoxLayout()
 		self.layout_controls.addWidget( self.button_chessboard )
+		self.layout_controls.addWidget( self.button_capture )
 		self.layout_controls.addWidget( self.button_calibration )
 		self.layout_controls.addLayout( self.layout_pattern_size )
 		self.layout_global = QtGui.QVBoxLayout( self )
@@ -96,11 +141,18 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 	# Toggle the chessboard preview
 	def ToggleChessboard( self ) :
 		self.chessboard_enabled = not self.chessboard_enabled
+	# Save the stereo images
+	def Capture( self ) :
+		current_time = time.strftime( '%Y%m%d_%H%M%S' )
+		print( 'Save images {} to disk...'.format( current_time ) )
+		cv2.imwrite( 'camera-{}.png'.format( current_time ), self.image )
 	# Stereo camera calibration
 	def Calibration( self ) :
 		self.calibration = CameraCalibration()
+		print( 'Calibration done.')
 	# Update the calibration pattern size
 	def UpdatePatternSize( self, _ ) :
+		global pattern_size
 		pattern_size = ( self.spinbox_pattern_rows.value(), self.spinbox_pattern_cols.value() )
 	# Close the widgets
 	def closeEvent( self, event ) :
@@ -110,64 +162,13 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 		event.accept()
 
 
-
-
-
-# Thread to read the images from a USB camera
-class UsbCamera( threading.Thread ) :
-	# Initialisation
-	def __init__( self ) :
-		# Initialize the thread
-		super( UsbCamera, self ).__init__()
-		# Initialize the cameras
-		self.camera = cv2.VideoCapture( 0 )
-	# Return the image width
-	@property
-	def width( self ) :
-		return self.camera.get( cv2.CAP_PROP_FRAME_WIDTH )
-	# Return the image height
-	@property
-	def height( self ) :
-		return self.camera.get( cv2.CAP_PROP_FRAME_HEIGHT )
-	# Start acquisition
-	def StartCapture( self, image_callback ) :
-		# Function called when the images are received
-		self.image_callback = image_callback
-		# Start the capture loop
-		self.running = True
-		self.start()
-	# Stop acquisition
-	def StopCapture( self ) :
-		self.running = False
-		self.join()
-	# Thread main loop
-	def run( self ) :
-		# Thread running
-		while self.running :
-			# Capture images
-			self.camera.grab()
-			# Get the images
-			_, image = self.camera.retrieve()
-			# Send the image via the external callback function
-			self.image_callback( image )
-		# Release the cameras
-		self.camera.release()
-
-
-
-# Save the calibration parameters to a file
-def SaveCalibration( calibration, filename = 'calibration.pkl' ) :
-	# Write the calibration object with all the parameters
-	with open( filename, 'wb') as calibration_file :
-		pickle.dump( calibration, calibration_file, pickle.HIGHEST_PROTOCOL )
-
 # Find the chessboard quickly, and draw it
 def PreviewChessboard( image ) :
 	# Convert image from BGR to Grayscale
-	chessboard = cv2.cvtColor( image, cv2.COLOR_BGR2GRAY )
+	grayscale_image = cv2.cvtColor( image, cv2.COLOR_BGR2GRAY )
 	# Find the chessboard corners on the image
-	found, corners = cv2.findChessboardCorners( chessboard, pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
-#	found, corners = cv2.findCirclesGridDefault( image, pattern_size, flags = cv2.CALIB_CB_ASYMMETRIC_GRID )
+	found, corners = cv2.findChessboardCorners( grayscale_image, pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
+#	found, corners = cv2.findCirclesGrid( grayscale_image, pattern_size, flags = cv2.CALIB_CB_ASYMMETRIC_GRID )
 	# Draw the chessboard corners on the image
 	if found : cv2.drawChessboardCorners( image, pattern_size, corners, found )
 	# Return the image with the chessboard if found
@@ -175,7 +176,9 @@ def PreviewChessboard( image ) :
 
 
 # Camera calibration
-def CameraCalibration( image_files ) :
+def CameraCalibration() :
+	# Calibration image files
+	image_files = sorted( glob.glob( 'camera-*.png' ) )
 	# Chessboard pattern
 	pattern_points = np.zeros( (np.prod(pattern_size), 3), np.float32 )
 	pattern_points[:,:2] = np.indices(pattern_size).T.reshape(-1, 2)
@@ -186,7 +189,7 @@ def CameraCalibration( image_files ) :
 #			pattern_points.append( [ (2*j) + i%2 , i, 0 ] )
 #	pattern_points = np.asarray( pattern_points, dtype=np.float32 )
 	# Get image size
-	height, width = image_files[0].shape[:2]
+	height, width = cv2.imread( image_files[0] ).shape[:2]
 #	img_size = tuple( cv2.pyrDown( cv2.imread( image_files[0] ), cv2.CV_LOAD_IMAGE_GRAYSCALE ).shape[:2] )
 	img_size = ( width, height )
 	# 3D points
@@ -210,7 +213,7 @@ def CameraCalibration( image_files ) :
 		flags |= cv2.CALIB_CB_NORMALIZE_IMAGE
 		# Find the chessboard corners on the image
 		found, corners = cv2.findChessboardCorners( image_small, pattern_size, flags=flags )
-	#	found, corners = cv2.findCirclesGridDefault( image, pattern_size, flags = cv2.CALIB_CB_ASYMMETRIC_GRID )
+	#	found, corners = cv2.findCirclesGrid( image, pattern_size, flags = cv2.CALIB_CB_ASYMMETRIC_GRID )
 		# Pattern not found
 		if not found :
 			print( 'Pattern not found on image {}...'.format( filename ) )
@@ -258,38 +261,21 @@ def CameraCalibration( image_files ) :
 	calibration['img_size'] = img_size
 	calibration['img_files'] = img_files
 	calibration['pattern_size'] = pattern_size
-	# Return the camera calibration results
-	return calibration
+	# Write calibration results
+	with open( 'calibration.log', 'w') as output_file :
+		output_file.write( '\n~~~ Camera calibration ~~~\n\n' )
+		output_file.write( 'Calibration error : {}\n'.format( calibration['calib_error'] ) )
+		output_file.write( 'Reprojection error : {}\n'.format( calibration['reproject_error'] ) )
+		output_file.write( 'Camera matrix :\n{}\n'.format( calibration['camera_matrix'] ) )
+		output_file.write( 'Distortion coefficients :\n{}\n'.format( calibration['dist_coefs'].ravel() ) )
+	# Write the calibration object with all the parameters
+	with open( 'calibration.pkl' , 'wb') as output_file :
+		pickle.dump( calibration, output_file, pickle.HIGHEST_PROTOCOL )
 
 
 # Main application
 if __name__ == '__main__' :
-
 	application = QtGui.QApplication( sys.argv )
 	widget = CameraCalibrationWidget()
 	widget.show()
 	sys.exit( application.exec_() )
-
-def maincv() :
-    # Calibration images
-    calibration_images = []
-    cap = cv2.VideoCapture( 0 )
-    while( True ) :
-        # Capture frame-by-frame
-        _, frame = cap.read()
-        # Find the chessboard corners on the image
-        found, corners = cv2.findChessboardCorners( frame, pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
-        image = np.copy( frame )
-        # Draw the chessboard corners on the image
-        if found :
-            cv2.drawChessboardCorners( frame, pattern_size, corners, found )
-        #    cv2.rectangle( frame, (int(corners[0,0,0]), int(corners[0,0,1])), (int(corners[53,0,0]), int(corners[53,0,1])), (0,255,0), 3 )
-        # Display the resulting frame
-        cv2.imshow( 'frame', frame )
-        # Wait for key pressed
-        key = cv2.waitKey( 1 ) & 0xFF
-        if  key == ord( 'q' ) : break
-        elif key == ord( ' ' ) and found : calibration_images.append( image )
-        elif key == ord ( 'c' ) : CameraCalibration( calibration_images )
-    # Close the windows
-    cv2.destroyAllWindows()
