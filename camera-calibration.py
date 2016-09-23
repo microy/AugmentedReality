@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 
 #
-# Augmented reality demonstration application
+# Camera calibration application
 #
 
 # External dependencies
@@ -28,7 +28,7 @@ class UsbCamera( threading.Thread ) :
 	def __init__( self ) :
 		# Initialize the thread
 		super( UsbCamera, self ).__init__()
-		# Initialize the cameras
+		# Initialize the camera
 		self.camera = cv2.VideoCapture( 0 )
 	# Return the image width
 	@property
@@ -57,11 +57,11 @@ class UsbCamera( threading.Thread ) :
 			_, image = self.camera.read()
 			# Send the image via the external callback function
 			self.image_callback( image )
-		# Release the cameras
+		# Release the camera
 		self.camera.release()
 
 
-# Stereovision user interface
+# User interface
 class CameraCalibrationWidget( QtGui.QWidget ) :
 	# Signal sent to update the image in the widget
 	update_image = QtCore.pyqtSignal()
@@ -75,7 +75,7 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 		self.chessboard_enabled = False
 		# Connect the signal to update the image
 		self.update_image.connect( self.UpdateImage )
-		# Widget to display the images from the cameras
+		# Widget to display the image from the camera
 		self.image_widget = QtGui.QLabel( self )
 		self.image_widget.setScaledContents( True )
 		# Widget elements
@@ -111,7 +111,7 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 		self.layout_global.setSizeConstraint( QtGui.QLayout.SetFixedSize )
 		# Set the Escape key to close the application
 		QtGui.QShortcut( QtGui.QKeySequence( QtCore.Qt.Key_Escape ), self ).activated.connect( self.close )
-		# Initialize the USB stereo cameras
+		# Initialize the camera
 		self.camera = UsbCamera()
 		# Fix the widget size
 		self.image_widget.setFixedSize( self.camera.width, self.camera.height )
@@ -121,9 +121,9 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 	def ImageCallback( self, image ) :
 		# Get the image
 		self.image = image
-		# Process the images
+		# Process the image
 		self.update_image.emit()
-	# Process the given stereo images
+	# Process and display the given image
 	def UpdateImage( self ) :
 		# Copy images for display
 		image_displayed = np.copy( self.image )
@@ -141,12 +141,12 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 	# Toggle the chessboard preview
 	def ToggleChessboard( self ) :
 		self.chessboard_enabled = not self.chessboard_enabled
-	# Save the stereo images
+	# Save the image
 	def Capture( self ) :
 		current_time = time.strftime( '%Y%m%d_%H%M%S' )
 		print( 'Save images {} to disk...'.format( current_time ) )
 		cv2.imwrite( 'camera-{}.png'.format( current_time ), self.image )
-	# Stereo camera calibration
+	# Camera calibration
 	def Calibration( self ) :
 		self.calibration = CameraCalibration()
 		print( 'Calibration done.')
@@ -154,7 +154,7 @@ class CameraCalibrationWidget( QtGui.QWidget ) :
 	def UpdatePatternSize( self, _ ) :
 		global pattern_size
 		pattern_size = ( self.spinbox_pattern_rows.value(), self.spinbox_pattern_cols.value() )
-	# Close the widgets
+	# Close the widget
 	def closeEvent( self, event ) :
 		# Stop image acquisition
 		self.camera.StopCapture()
