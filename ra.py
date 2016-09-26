@@ -68,9 +68,16 @@ class Widget( QtGui.QWidget ) :
 		# Widget to display the images from the cameras
 		self.image_widget = QtGui.QLabel( self )
 		self.image_widget.setScaledContents( True )
+		# Widget element
+		self.button_activate_ar = QtGui.QPushButton( 'Activate AR', self )
+		self.button_activate_ar.setCheckable( True )
+		self.button_activate_ar.setShortcut( 'F1' )
+		self.button_activate_ar.clicked.connect( self.ToggleAR )
+		self.ar_activated = False
 		# Widget layout
 		self.layout_global = QtGui.QVBoxLayout( self )
 		self.layout_global.addWidget( self.image_widget )
+		self.layout_global.addWidget( self.button_activate_ar )
 		self.layout_global.setSizeConstraint( QtGui.QLayout.SetFixedSize )
 		# Set the Escape key to close the application
 		QtGui.QShortcut( QtGui.QKeySequence( QtCore.Qt.Key_Escape ), self ).activated.connect( self.close )
@@ -85,6 +92,8 @@ class Widget( QtGui.QWidget ) :
 		self.image_widget.setFixedSize( self.camera.width, self.camera.height )
 		# Start image acquisition
 		self.camera.StartCapture(  self.ImageCallback  )
+	def ToggleAR( self ) :
+		self.ar_activated = not self.ar_activated
 	# Receive the frame sent by the camera
 	def ImageCallback( self, image ) :
 		# Get the image
@@ -94,47 +103,50 @@ class Widget( QtGui.QWidget ) :
 	# Process the given image for display
 	def UpdateImage( self ) :
 		# Copy image for display
-		image_displayed = np.copy( self.image )
-		# Convert image from BGR to Grayscale
-		grayscale_image = cv2.cvtColor( self.image, cv2.COLOR_BGR2GRAY )
-		# Find the chessboard corners on the image
-		found, corners = cv2.findChessboardCorners( grayscale_image, self.pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
-		# Draw the chessboard corners on the image
-		if found :
-			# Refine the corner positions
-			cv2.cornerSubPix( grayscale_image, corners, (11, 11), (-1, -1), ( cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 30, 0.1 ) )
-			# Overlay image coordinates
-			source = []
-			source.append( [0, 0] )
-			source.append( [self.video.shape[1], 0] )
-			source.append( [self.video.shape[1], self.video.shape[0]] )
-			source.append( [0, self.video.shape[0]] )
-			source = np.array( source, dtype = np.float32 )
-			# Destination image coordinates
-			destination = []
-			destination.append( corners[0].flatten() )
-			destination.append( corners[4].flatten() )
-			destination.append( corners[19].flatten() )
-			destination.append( corners[15].flatten() )
-			destination = np.array( destination, dtype = np.float32 )
-			# Compute the transformation matrix,
-			# i.e., transformation required to overlay the display image from 'src' points to 'dst' points on the image
-			tranformation_matrix = cv2.getPerspectiveTransform( source, destination )
+	#	image_displayed = np.copy( self.image )
+		# Process the image if the AR is activated
+		if self.ar_activated :
+			# Convert image from BGR to Grayscale
+			grayscale_image = cv2.cvtColor( self.image, cv2.COLOR_BGR2GRAY )
+			# Find the chessboard corners on the image
+			found, corners = cv2.findChessboardCorners( grayscale_image, self.pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
+			# Draw the video on the chessboard
+			if found :
+				# Refine the corner positions
+				cv2.cornerSubPix( grayscale_image, corners, (11, 11), (-1, -1), ( cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 30, 0.1 ) )
+				print( 'found' )
+				# Overlay image coordinates
+				source = []
+				source.append( [0, 0] )
+				source.append( [self.video.shape[1], 0] )
+				source.append( [self.video.shape[1], self.video.shape[0]] )
+				source.append( [0, self.video.shape[0]] )
+				source = np.array( source, dtype = np.float32 )
+				# Destination image coordinates
+				destination = []
+				destination.append( corners[0].flatten() )
+				destination.append( corners[4].flatten() )
+				destination.append( corners[19].flatten() )
+				destination.append( corners[15].flatten() )
+				destination = np.array( destination, dtype = np.float32 )
+				# Compute the transformation matrix,
+				# i.e., transformation required to overlay the display image from 'src' points to 'dst' points on the image
+				tranformation_matrix = cv2.getPerspectiveTransform( source, destination )
 
-			blank = np.zeros( self.video.shape, self.video.dtype )
-			neg_img = np.zeros( self.image.shape, self.image.dtype )
-			cpy_img = np.zeros( self.image.shape, self.image.dtype )
-			blank = cv2.bitwise_not( blank )
-			display = cv2.warpPerspective( neg_img, tranformation_matrix, (neg_img.shape[0], neg_img.shape[1]) )
-			blank = cv2.warpPerspective( cpy_img, tranformation_matrix, (cpy_img.shape[0], neg_img.shape[1]) )
-			cpy_img = cv2.bitwise_not( cpy_img )
-			cpy_img = cv2.bitwise_and( cpy_img, self.image )
-			self.image = cv2.bitwise_or( cpy_img, neg_img )
+				blank = np.zeros( self.video.shape, self.video.dtype )
+				neg_img = np.zeros( self.image.shape, self.image.dtype )
+				cpy_img = np.zeros( self.image.shape, self.image.dtype )
+				blank = cv2.bitwise_not( blank )
+				display = cv2.warpPerspective( neg_img, tranformation_matrix, (neg_img.shape[0], neg_img.shape[1]) )
+				blank = cv2.warpPerspective( cpy_img, tranformation_matrix, (cpy_img.shape[0], neg_img.shape[1]) )
+				cpy_img = cv2.bitwise_not( cpy_img )
+				cpy_img = cv2.bitwise_and( cpy_img, self.image )
+				self.image = cv2.bitwise_or( cpy_img, neg_img )
 
 		# Convert image color format from BGR to RGB
-		image_displayed = cv2.cvtColor( self.image, cv2.COLOR_BGR2RGB )
+		self.image = cv2.cvtColor( self.image, cv2.COLOR_BGR2RGB )
 		# Create a Qt image
-		qimage = QtGui.QImage( image_displayed, image_displayed.shape[1], image_displayed.shape[0], QtGui.QImage.Format_RGB888 )
+		qimage = QtGui.QImage( self.image, self.image.shape[1], self.image.shape[0], QtGui.QImage.Format_RGB888 )
 		# Set the image to the Qt widget
 		self.image_widget.setPixmap( QtGui.QPixmap.fromImage( qimage ) )
 		# Update the widget
