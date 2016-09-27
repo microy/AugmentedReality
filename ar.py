@@ -64,18 +64,17 @@ class Widget( QtGui.QWidget ) :
 	# Process the given image for display
 	def UpdateImage( self ) :
 		# Copy image for display
-	#	image_displayed = np.copy( self.image )
+		image = np.copy( self.image )
 		# Process the image if the AR is activated
 		if self.ar_activated :
 			# Convert image from BGR to Grayscale
-			grayscale_image = cv2.cvtColor( self.image, cv2.COLOR_BGR2GRAY )
+			grayscale_image = cv2.cvtColor( image, cv2.COLOR_BGR2GRAY )
 			# Find the chessboard corners on the image
 			found, corners = cv2.findChessboardCorners( grayscale_image, self.pattern_size, flags = cv2.CALIB_CB_FAST_CHECK )
 			# Draw the video on the chessboard
 			if found :
 				# Refine the corner positions
 				cv2.cornerSubPix( grayscale_image, corners, (11, 11), (-1, -1), ( cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 30, 0.1 ) )
-				print( 'found' )
 				# Overlay image coordinates
 				source = []
 				source.append( [0, 0] )
@@ -93,21 +92,20 @@ class Widget( QtGui.QWidget ) :
 				# Compute the transformation matrix,
 				# i.e., transformation required to overlay the display image from 'src' points to 'dst' points on the image
 				tranformation_matrix = cv2.getPerspectiveTransform( source, destination )
-
 				blank = np.zeros( self.video.shape, self.video.dtype )
-				neg_img = np.zeros( self.image.shape, self.image.dtype )
-				cpy_img = np.zeros( self.image.shape, self.image.dtype )
+				neg_img = np.zeros( image.shape, image.dtype )
+				cpy_img = np.zeros( image.shape, image.dtype )
 				blank = cv2.bitwise_not( blank )
-				display = cv2.warpPerspective( neg_img, tranformation_matrix, (neg_img.shape[0], neg_img.shape[1]) )
-				blank = cv2.warpPerspective( cpy_img, tranformation_matrix, (cpy_img.shape[0], neg_img.shape[1]) )
+				neg_img = cv2.warpPerspective( self.video, tranformation_matrix, (neg_img.shape[1], neg_img.shape[0]) )
+				cpy_img = cv2.warpPerspective( blank, tranformation_matrix, (cpy_img.shape[1], neg_img.shape[0]) )
 				cpy_img = cv2.bitwise_not( cpy_img )
-				cpy_img = cv2.bitwise_and( cpy_img, self.image )
-				self.image = cv2.bitwise_or( cpy_img, neg_img )
+				cpy_img = cv2.bitwise_and( cpy_img, image )
+				image = cv2.bitwise_or( cpy_img, neg_img )
 
 		# Convert image color format from BGR to RGB
-		self.image = cv2.cvtColor( self.image, cv2.COLOR_BGR2RGB )
+		image = cv2.cvtColor( image, cv2.COLOR_BGR2RGB )
 		# Create a Qt image
-		qimage = QtGui.QImage( self.image, self.image.shape[1], self.image.shape[0], QtGui.QImage.Format_RGB888 )
+		qimage = QtGui.QImage( image, image.shape[1], image.shape[0], QtGui.QImage.Format_RGB888 )
 		# Set the image to the Qt widget
 		self.image_widget.setPixmap( QtGui.QPixmap.fromImage( qimage ) )
 		# Update the widget
