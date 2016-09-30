@@ -31,18 +31,18 @@ while True :
     # Create greyscale image from the video feed
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # Detect faces in input video stream
-    faces = faceCascade.detectMultiScale( gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30) )
+    faces = faceCascade.detectMultiScale( gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=0 )
    # Iterate over each face found
     for ( x, y, w, h ) in faces :
         # Un-comment the next line for debug (draw box around all faces)
-    #    face = cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
+        face = cv2.rectangle(frame,(x,y),(x+w,y+h),(255,0,0),2)
         roi_gray = gray[ y:y+h, x:x+w ]
         roi_color = frame[ y:y+h, x:x+w ]
         # Detect a nose within the region bounded by each face (the ROI)
         nose = noseCascade.detectMultiScale(roi_gray)
         for ( nx, ny, nw, nh ) in nose :
             # Un-comment the next line for debug (draw box around the nose)
-    #        cv2.rectangle(roi_color,(nx,ny),(nx+nw,ny+nh),(255,0,0),2)
+            cv2.rectangle(roi_color,(nx,ny),(nx+nw,ny+nh),(255,0,0),2)
             # The mustache should be three times the width of the nose
             mustacheWidth =  3 * nw
             mustacheHeight = mustacheWidth * origMustacheHeight / origMustacheWidth
@@ -65,16 +65,19 @@ while True :
             mask = cv2.resize( orig_mask, (mustacheWidth,mustacheHeight), interpolation = cv2.INTER_AREA)
             mask_inv = cv2.resize( orig_mask_inv, (mustacheWidth,mustacheHeight), interpolation = cv2.INTER_AREA)
             # take ROI for mustache from background equal to size of mustache image
-        #    roi = roi_color[ y1:y2, x1:x2 ]
+            roi = roi_color[ y1:y2, x1:x2 ]
             # roi_bg contains the original image only where the mustache is not
             # in the region that is the size of the mustache.
-        #    roi_bg = cv2.bitwise_and( roi, roi, mask = mask_inv )
+            print(roi.shape)
+            print(mask_inv.shape)
+            if roi.shape[:2] != mask_inv.shape : continue
+            roi_bg = cv2.bitwise_and( roi, roi, mask = mask_inv )
             # roi_fg contains the image of the mustache only where the mustache is
-        #    roi_fg = cv2.bitwise_and( mustache, mustache, mask = mask )
+            roi_fg = cv2.bitwise_and( mustache, mustache, mask = mask )
             # join the roi_bg and roi_fg
-        #    dst = cv2.add( roi_bg, roi_fg )
+            dst = cv2.add( roi_bg, roi_fg )
             # place the joined image, saved to dst back over the original image
-        #    roi_color[ y1:y2, x1:x2 ] = dst
+            roi_color[ y1:y2, x1:x2 ] = dst
             break
     # Display the resulting frame
     cv2.imshow('Video', frame)
