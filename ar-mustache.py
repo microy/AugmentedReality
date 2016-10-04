@@ -31,8 +31,10 @@ while True :
     _, frame = video_capture.read()
     # Create greyscale image from the video feed
     gray = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY )
+#    gray = cv2.equalizeHist( gray )
     # Detect faces in input video stream
-    faces = faceCascade.detectMultiScale( gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=0 )
+#    faces = faceCascade.detectMultiScale( gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30), flags=0 )
+    faces = faceCascade.detectMultiScale( gray, scaleFactor=1.3, minNeighbors=4, minSize=(30, 30), flags=cv2.CASCADE_SCALE_IMAGE )
     # Iterate over each face found
     for ( x, y, w, h ) in faces :
         # Un-comment the next line for debug (draw box around all faces)
