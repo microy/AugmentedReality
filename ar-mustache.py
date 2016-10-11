@@ -14,7 +14,7 @@ faceCascade = cv2.CascadeClassifier( 'haarcascade_frontalface_default.xml' )
 noseCascade = cv2.CascadeClassifier( 'haarcascade_mcs_nose.xml' )
 #noseCascade = cv2.CascadeClassifier( 'Nariz.xml' )
 # Load our overlay image: mustache.png
-imgMustache = cv2.imread( 'mustache.png', -1 )
+imgMustache = cv2.imread( 'mustache1.png', -1 )
 # Create the mask for the mustache
 orig_mask = imgMustache[ :, :, 3 ]
 # Create the inverted mask for the mustache
@@ -38,14 +38,14 @@ while True :
     # Iterate over each face found
     for ( x, y, w, h ) in faces :
         # Un-comment the next line for debug (draw box around all faces)
-        face = cv2.rectangle( frame, (x,y), (x+w,y+h), (255,0,0), 2 )
+    #    face = cv2.rectangle( frame, (x,y), (x+w,y+h), (255,0,0), 2 )
         roi_gray = gray[ y:y+h, x:x+w ]
         roi_color = frame[ y:y+h, x:x+w ]
         # Detect a nose within the region bounded by each face (the ROI)
         nose = noseCascade.detectMultiScale( roi_gray )
         for ( nx, ny, nw, nh ) in nose :
             # Un-comment the next line for debug (draw box around the nose)
-            cv2.rectangle( roi_color, (nx,ny), (nx+nw,ny+nh), (255,0,0), 2 )
+    #        cv2.rectangle( roi_color, (nx,ny), (nx+nw,ny+nh), (255,0,0), 2 )
             # The mustache should be three times the width of the nose
             mustacheWidth =  3 * nw
             mustacheHeight = mustacheWidth * origMustacheHeight / origMustacheWidth
@@ -83,6 +83,6 @@ while True :
     # Display the resulting frame
     cv2.imshow( 'Video', frame )
     # Press q key to exit
-    if cv2.waitKey(1) & 0xFF == ord('q'): break
+    if cv2.waitKey(1) & 0xFF == 27 : break
 # When everything is done, release the capture
 cv2.destroyAllWindows()
