@@ -12,9 +12,8 @@ import cv2
 # Haar Cascade Classifiers
 faceCascade = cv2.CascadeClassifier( 'haarcascade_frontalface_default.xml' )
 noseCascade = cv2.CascadeClassifier( 'haarcascade_mcs_nose.xml' )
-#noseCascade = cv2.CascadeClassifier( 'Nariz.xml' )
-# Load our overlay image: mustache.png
-imgMustache = cv2.imread( 'mustache1.png', -1 )
+# Load our overlay image
+imgMustache = cv2.imread( 'mustache.png', -1 )
 # Create the mask for the mustache
 orig_mask = imgMustache[ :, :, 3 ]
 # Create the inverted mask for the mustache
@@ -82,7 +81,7 @@ while True :
             break
     # Display the resulting frame
     cv2.imshow( 'Video', frame )
-    # Press q key to exit
+    # Press Escape key to exit
     if cv2.waitKey(1) & 0xFF == 27 : break
 # When everything is done, release the capture
 cv2.destroyAllWindows()
