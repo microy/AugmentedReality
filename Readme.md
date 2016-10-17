@@ -1,2 +1,2 @@
-# AugmentedReality
-Augmented Reality Demonstation Application
+# Augmented Reality
+Augmented Reality Demonstation Applications
